@@ -1,0 +1,68 @@
+\documentclass[conference]{IEEEtran}
+\usepackage{amsmath}
+\usepackage{balance}
+\begin{document}
+\title{Dimensionality Reduction for Satellite Ship Classification}
+\author{\IEEEauthorblockN{Taher Akolawala}}
+\maketitle
+\begin{abstract}
+This paper examines whether dimensionality reduction improves classical ship classification on small satellite-image crops. The underlying project compares logistic regression and support vector machines (SVMs) on 4,000 labeled, 80$\times$80 RGB images, using raw flattened pixels, principal component analysis (PCA), Isomap, and locally linear embedding (LLE). Saved notebook output reports an F1 score of 0.8495 for PCA plus SVM on an 800-image holdout, compared with 0.7677 for the raw-pixel SVM; both LLE pipelines report zero F1. The selected PCA--SVM pipeline uses 150 components instead of 19,200 pixel features. These are exploratory results from one random split and saved outputs, not an independently rerun benchmark. The experiment illustrates both the value of a compact representation and the need to separate cross-validation, holdout results, and deployment claims.
+\end{abstract}
+\begin{IEEEkeywords}
+satellite imagery, ship classification, principal component analysis, support vector machine, manifold learning
+\end{IEEEkeywords}
+
+\section{Introduction}
+Ship recognition in overhead imagery is a useful binary classification problem: a small vessel can occupy only part of a crop, while water, shoreline, wakes, and lighting change the surrounding appearance. The public Ships in Satellite Imagery dataset contains 4,000 labeled crops from the San Francisco and San Pedro Bay areas, each with 80$\times$80 RGB pixels \cite{dataset}. A direct classical classifier receives 19,200 features per crop, large relative to the number of examples. This motivates a comparison of lower-dimensional representations before classification.
+
+The project repository supplies training and test notebooks, images, and the dataset arrays \cite{repo}. Its experimental question is whether reduced representations can preserve ship/no-ship discrimination while changing fit and prediction cost. This paper summarizes the implemented pipelines and distinguishes the notebooks' reported holdout results from training-set and cross-validation statistics. It does not claim operational maritime performance.
+
+\section{Data and Experimental Design}
+The stored arrays have shape $(4000,80,80,3)$ and contain 3,000 no-ship and 1,000 ship labels. The notebooks flatten each crop to a 19,200-dimensional vector and use an 80/20 split with \texttt{random\_state=91}, yielding 3,200 training and 800 test images \cite{repo}. The split call does not request stratification, even though the README describes it as stratified. Preprocessing and estimators are assembled in scikit-learn pipelines, so the scaling and reductions are fitted within the training side of each cross-validation fold \cite{sklearn,repo}.
+
+The baseline estimators are logistic regression and an SVM. The reduced pipelines insert PCA, Isomap, or LLE before either classifier. Grid search optimizes F1 with three-fold cross-validation on the training data. Candidate PCA dimensions are 50, 80, 109, and 150; the saved search selects 150 for both PCA pipelines. A separate exploratory variance analysis identifies 109 components as approximately sufficient for 90\% explained variance. These numbers answer different questions: 109 describes a variance threshold, whereas 150 is the classifier dimension selected by the search.
+
+For binary predictions, precision $P$ and recall $R$ are combined as
+\begin{equation}
+F_1=\frac{2PR}{P+R}.
+\end{equation}
+F1 is more informative than accuracy alone for the 1:3 ship-to-no-ship imbalance, though it still depends on the classifier's decision threshold. The repository does not provide an external test region or a scene-level split.
+
+\section{Reported Results}
+\begin{table}[ht]
+\caption{Saved notebook output on the 800-image holdout}
+\centering
+\begin{tabular}{lcc}
+\hline
+Pipeline & F1 & Prediction time (s) \\
+\hline
+Raw SVM & 0.7677 & 3.6666 \\
+Raw logistic regression & 0.7990 & 0.0566 \\
+PCA + SVM & \textbf{0.8495} & 0.1613 \\
+PCA + logistic regression & 0.8333 & 0.1485 \\
+Isomap + SVM & 0.8324 & 1.7153 \\
+Isomap + logistic regression & 0.8404 & 1.6647 \\
+LLE + SVM & 0.0000 & 2.0357 \\
+LLE + logistic regression & 0.0000 & 1.8648 \\
+\hline
+\end{tabular}
+\end{table}
+Table I transcribes the saved output of \texttt{test.ipynb} \cite{repo}. The PCA--SVM result is the highest F1 among the listed runs. The raw SVM is notably slower in this one recorded prediction pass, but elapsed times depend on hardware, software state, and run-to-run variation; the notebook does not establish a stable latency benchmark. The training notebook separately reports a cross-validation best F1 of 0.8447 for PCA plus SVM and mean candidate fit times of 8.95 s for its PCA search versus 17.95 s for the raw SVM search. These are search statistics, not measured training times for deployed selected models.
+
+Both LLE pipelines have zero holdout F1. The training notebook's confusion matrices show all-negative predictions for those saved models, consistent with failure to recover the ship class at the chosen settings. Isomap performs better than LLE but does not exceed PCA plus SVM on the saved holdout. The notebook's 3,200-example confusion matrices are computed on the training split and must not be read as test confusion matrices. Similarly, the README's 92.22\% accuracy is not presented here as an independent holdout result.
+
+\balance
+\section{Limitations and Reproducibility}
+The evidence is limited to one random image-level split. Crops from related geographic scenes may be correlated across training and test sets, so a scene-held-out evaluation would better probe transfer to new imagery. The split is not stratified in code, and neither confidence intervals nor repeated random seeds are reported. The repository contains notebook outputs but not all serialized fitted models referenced by \texttt{test.ipynb}; a fresh evaluation therefore requires rerunning training. The present paper reports saved output rather than claiming a fresh model reproduction.
+
+Further work should report confusion matrices and precision--recall curves on the holdout, repeat the split across seeds, compare scene-level generalization, and rerun timing on a specified machine. A calibrated operating threshold would matter more than a single F1 score for any monitoring use. PCA and manifold methods should also be compared with a compact convolutional baseline before drawing conclusions about practical ship detection.
+
+\section{Conclusion}
+On the repository's saved 800-image test output, PCA plus SVM attains 0.8495 F1 and exceeds the raw-pixel SVM's 0.7677. The chosen 150-component representation is substantially smaller than the original feature vector. LLE fails at the tested settings. These observations support PCA as the strongest pipeline in this specific exploratory comparison; broader deployment claims require reproducible, scene-aware evaluation.
+
+\begin{thebibliography}{3}
+\bibitem{dataset} R. Hammell, ``Ships in Satellite Imagery,'' Kaggle dataset. [Online]. Available: \texttt{kaggle.com/datasets/rhammell/ships-in-satellite-imagery}
+\bibitem{sklearn} F. Pedregosa \emph{et al.}, ``Scikit-learn: Machine learning in Python,'' \emph{J. Mach. Learn. Res.}, vol. 12, pp. 2825--2830, 2011.
+\bibitem{repo} T. Akolawala, ``Satellite Ship Detection,'' GitHub repository, 2026. [Online]. Available: \texttt{github.com/taherakolawala/satellite-ship-detection}
+\end{thebibliography}
+\end{document}
