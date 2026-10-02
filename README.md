@@ -1,5 +1,7 @@
 # Evaluating Dimensionality Reduction Techniques on Satellite Imagery Classification
 
+[Read the IEEE-style paper (PDF)](paper/satellite-ship-detection-ieee.pdf) · [LaTeX source](paper/satellite-ship-detection-ieee.tex)
+
 **Taher Akolawala**
 
 ---
